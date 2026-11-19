@@ -59,7 +59,7 @@ if not GROQ_API_KEY:
 # LLM - original model kept
 # =========================
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"),
     api_key=GROQ_API_KEY,
 )
 
@@ -132,6 +132,22 @@ def _json_from_llm(text: str) -> dict[str, Any]:
         raise ValueError("The model did not return a JSON object.")
 
     return json.loads(text[start : end + 1])
+
+
+# Per-field character limits keep prompts under Groq's free-tier 8k tokens/minute.
+CLIP_LIMITS = {
+    "flight_results": 1500,
+    "hotel_results": 2000,
+    "weather_results": 1000,
+    "budget_results": 1500,
+    "itinerary": 6000,
+}
+
+
+def _clip(state: "TravelState", key: str) -> str:
+    text = str(state.get(key, "") or "")
+    limit = CLIP_LIMITS.get(key, 2000)
+    return text if len(text) <= limit else text[:limit] + "\n...[truncated]"
 
 
 def _empty_constraints() -> dict[str, Any]:
@@ -457,13 +473,13 @@ Trip Constraints:
 {state.get('trip_constraints', {})}
 
 Flight Results:
-{state.get('flight_results', '')}
+{_clip(state, 'flight_results')}
 
 Hotel Results:
-{state.get('hotel_results', '')}
+{_clip(state, 'hotel_results')}
 
 Weather Results:
-{state.get('weather_results', '')}
+{_clip(state, 'weather_results')}
 
 Return:
 1. Estimated cost categories
@@ -502,16 +518,16 @@ Trip Constraints:
 {state.get('trip_constraints', {})}
 
 Flight Results:
-{state.get('flight_results', '')}
+{_clip(state, 'flight_results')}
 
 Hotel Results:
-{state.get('hotel_results', '')}
+{_clip(state, 'hotel_results')}
 
 Weather Results:
-{state.get('weather_results', '')}
+{_clip(state, 'weather_results')}
 
 Budget Results:
-{state.get('budget_results', '')}
+{_clip(state, 'budget_results')}
 
 Make the itinerary practical, budget-aware, and easy to follow.
 Create a clear draft that is ready for human review.
@@ -593,19 +609,19 @@ Supervisor Constraints:
 {state.get('trip_constraints', {})}
 
 Flights:
-{state.get('flight_results', '')}
+{_clip(state, 'flight_results')}
 
 Hotels:
-{state.get('hotel_results', '')}
+{_clip(state, 'hotel_results')}
 
 Weather:
-{state.get('weather_results', '')}
+{_clip(state, 'weather_results')}
 
 Budget Analysis:
-{state.get('budget_results', '')}
+{_clip(state, 'budget_results')}
 
 Draft Itinerary:
-{state.get('itinerary', '')}
+{_clip(state, 'itinerary')}
 
 Format the final answer beautifully using these sections:
 1. Trip Summary
